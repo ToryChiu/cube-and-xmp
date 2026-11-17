@@ -23,6 +23,6 @@
 
 .drop-zone.drop-active::after {
   border-color: var(--accent);
-  background: rgba(233, 195, 99, .1);
+  background: rgba(244, 154, 81, .1);
   color: #f7e8bd;
 }

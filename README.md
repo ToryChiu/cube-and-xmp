@@ -18,7 +18,11 @@ python3 -m venv .venv
 
 Cine/Full 模式默认可以使用项目的 Rec.709 Gamma 2.4 转换。若你已取得 Sony 官方 LC-709 Look Profile，可把 Full in / Full out 版本放到 `core/lutcore/assets/Sony_SLog3_SGamut3_CineToLC709.cube`，程序会自动用于 Cine/Full 匹配。该文件不随源码分发。
 
-以下是原 Reference Match 的使用说明。
+## macOS 安装包
+
+当前版本通过浏览器使用本地服务。制作独立安装包时，先构建能独立启动的 macOS `.app`，将 Python、RAW 解码、FFmpeg 和界面资源一起打包，在一台未安装这些依赖的 Mac 上验证。然后把 `.app` 放入 DMG，需要公开分享时可作为 GitHub Release 附件上传。
+
+以下是原 Reference Match 的使用说明，其中的安装包属于原项目。
 
 # Reference LUT / 参考图仿色 LUT 生成器
 

@@ -64,7 +64,7 @@ function updateMatchButton() {
 
 function setRangeAppearance(input) {
   const percent = (Number(input.value) - Number(input.min)) / (Number(input.max) - Number(input.min)) * 100;
-  input.style.background = `linear-gradient(to right,#ebc45f ${percent}%,#545b67 ${percent}%)`;
+  input.style.background = `linear-gradient(to right,var(--accent) ${percent}%,#4b4844 ${percent}%)`;
 }
 
 function resetCachedResult() {

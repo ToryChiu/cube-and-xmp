@@ -4,15 +4,20 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>cube and xmp</title>
+    <link rel="icon" type="image/png" href="assets/cube-and-xmp.png">
     <link rel="stylesheet" href="css/styles.css" />
     <link rel="stylesheet" href="css/empty-state.css" />
     <link rel="stylesheet" href="css/drop-zone.css" />
     <link rel="stylesheet" href="css/match-protection.css" />
   </head>
   <body>
-    <header class="topbar"><div class="brand"><span class="mark">C</span>cube and xmp</div><div id="runtime-status" class="status"><i></i>正在连接本地服务</div></header>
+    <header class="topbar">
+      <a href="/" class="brand"><img class="brand-logo" src="assets/cube-and-xmp.png" alt="" width="42" height="42"><span>Cube <b>&amp;</b> XMP</span></a>
+      <nav class="workspace-nav" aria-label="工作区"><a href="/" aria-current="page">视频 LUT</a><a href="photo.html">照片追色</a></nav>
+      <div id="runtime-status" class="status"><i></i>正在连接本地服务</div>
+    </header>
     <main>
-      <header class="work-head"><div><h1>视频 LUT</h1><p>基于 OKLab 色彩空间与分区直方图匹配原理进行色彩与光影匹配。</p></div><div class="work-actions"><a class="small-button" href="photo.html">照片追色</a><button id="settings" class="small-button settings-button" type="button">设置</button><span id="match-status" class="status">等待导入两张图片</span></div></header>
+      <header class="work-head"><div><h1>视频 LUT</h1></div><div class="work-actions"><button id="settings" class="small-button settings-button" type="button">设置</button><span id="match-status" class="status">等待导入两张图片</span></div></header>
       <section class="image-grid" aria-label="参考图、视频静帧与匹配预览">
         <article class="media-card"><header><h2>参考图</h2><span id="reference-meta">未导入</span></header><div class="equal-frame drop-zone" data-drop-target="reference"><img id="reference-image" alt="参考图预览" hidden><span id="reference-empty">粘贴截图、拖入或选择参考图</span></div><footer><span id="reference-name">尚未选择图片</span><button id="choose-reference" class="small-button" type="button">选择图片</button></footer></article>
         <article class="media-card"><header><h2>视频静帧</h2><span id="content-meta">未导入</span></header><div class="equal-frame drop-zone" data-drop-target="content"><img id="content-image" alt="视频静帧预览" hidden><span id="content-empty">拖入或选择视频静帧</span></div><footer><span id="content-name">尚未选择图片</span><button id="choose-video" class="small-button" type="button">打开原片</button><button id="choose-content" class="small-button" type="button">选择图片</button></footer></article>
