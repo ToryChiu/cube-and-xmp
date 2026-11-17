@@ -35,6 +35,7 @@ CACHE_EXTENSIONS = {".cube", ".png", ".json"}
 
 sys.path.insert(0, str(CORE_ROOT))
 from generate_lut import load_rgb_tensor, save_preview  # noqa: E402
+from adobe_export import write_adobe_bundle
 from photo_edit import SRGB, downsample, fit_photo, read_photo, render_photo
 from video_frame import extract_log_frame, video_info
 from lutcore.colour_management import uses_sony_lc709_baseline
@@ -397,6 +398,13 @@ class ReferenceLutHandler(BaseHTTPRequestHandler):
             residual = fits[reference_id]
         else:
             controls = {"strength": 0}
+        if payload.get("export") == "adobe":
+            if residual is None:
+                raise ValueError("导出 Adobe 预设前请先选择参考图。")
+            destination = output_directory() / f"cube-and-xmp-adobe-{uuid.uuid4().hex[:8]}.zip"
+            write_adobe_bundle(destination, residual, controls)
+            self.send_json({"url": self.artifact_url(destination, download=True)})
+            return
         if payload.get("export") is True:
             rendered = render_photo(read_photo(path), residual, controls)
             destination = output_directory() / f"cube-and-xmp-{uuid.uuid4().hex[:8]}.jpg"

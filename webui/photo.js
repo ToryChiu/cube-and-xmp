@@ -208,20 +208,21 @@
   form.onsubmit = async event => {
     event.preventDefault();
     if (!original || !reference) return;
-    const button = form.querySelector('button[type=submit]');
-    button.disabled = true;
-    status.textContent = '正在导出全分辨率 JPG…';
+    const buttons = [...form.querySelectorAll('button[type=submit]')];
+    const adobe = event.submitter?.value === 'adobe';
+    buttons.forEach(button => { button.disabled = true; });
+    status.textContent = adobe ? '正在导出 Adobe 预设和追色 LUT…' : '正在导出全分辨率 JPG…';
     try {
-      const response = await renderRequest({ export: true });
+      const response = await renderRequest({ export: adobe ? 'adobe' : true });
       const { url } = await response.json();
       const download = document.createElement('a');
       download.href = url;
       download.click();
-      status.textContent = '全分辨率 JPG 已导出。';
+      status.textContent = adobe ? 'XMP 和追色 LUT 已打包导出。' : '全分辨率 JPG 已导出。';
     } catch (error) {
       status.textContent = error.message;
     } finally {
-      button.disabled = false;
+      buttons.forEach(button => { button.disabled = false; });
     }
   };
   reset();
