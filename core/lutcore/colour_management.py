@@ -205,8 +205,8 @@ def slog3_to_rec709_gamma24(
 
 
 def uses_sony_lc709_baseline(*, gamut: str, input_range: str) -> bool:
-    """Whether an input exactly matches the bundled Sony Cine/Full Look Profile."""
-    return gamut == "sgamut3-cine" and input_range == "full"
+    """Whether the optional Sony Look Profile is available for this input."""
+    return gamut == "sgamut3-cine" and input_range == "full" and _SONY_LC709_CUBE_PATH.is_file()
 
 
 @lru_cache(maxsize=1)
@@ -253,10 +253,8 @@ def slog3_to_display_match_domain(
 ) -> Any:
     """Restore S-Log3 into the exact display baseline used by matching.
 
-    Cine/Full uses the bundled Sony LC-709 Look Profile, which is the same
-    restoration LUT the user supplied.  Other supported Sony combinations
-    retain the explicit analytical Rec.709 Gamma 2.4 fallback rather than
-    incorrectly reusing a Cine/Full LUT.
+    Cine/Full uses the Sony LC-709 Look Profile when installed. Other inputs
+    and installations without the asset use the Rec.709 Gamma 2.4 transform.
     """
     if uses_sony_lc709_baseline(gamut=gamut, input_range=input_range):
         return sony_slog3_cine_to_lc709(image)

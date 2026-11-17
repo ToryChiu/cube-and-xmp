@@ -5,6 +5,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
+import tempfile
+from io import BytesIO
 import mimetypes
 import os
 import re
@@ -32,6 +35,9 @@ CACHE_EXTENSIONS = {".cube", ".png", ".json"}
 
 sys.path.insert(0, str(CORE_ROOT))
 from generate_lut import load_rgb_tensor, save_preview  # noqa: E402
+from photo_edit import SRGB, downsample, fit_photo, read_photo, render_photo
+from video_frame import extract_log_frame, video_info
+from lutcore.colour_management import uses_sony_lc709_baseline
 from lutcore.reference_analysis import analyse_reference  # noqa: E402
 
 
@@ -127,9 +133,15 @@ class ReferenceLutServer(ThreadingHTTPServer):
     daemon_threads = True
 
     def __init__(self, address: tuple[str, int]):
-        super().__init__(address, ReferenceLutHandler)
         self.uploads: dict[str, dict[str, Any]] = {}
         self.artifacts: dict[str, Path] = {}
+        self.scratch = tempfile.TemporaryDirectory(prefix="cube-and-xmp-")
+        self.photos: dict[str, tuple[Path, Any, Any]] = {}
+        super().__init__(address, ReferenceLutHandler)
+
+    def server_close(self) -> None:
+        super().server_close()
+        self.scratch.cleanup()
 
 
 class ReferenceLutHandler(BaseHTTPRequestHandler):
@@ -219,6 +231,9 @@ class ReferenceLutHandler(BaseHTTPRequestHandler):
             return
         requested = "index.html" if path in {"/", ""} else path.lstrip("/")
         candidate = (WEB_ROOT / requested).resolve()
+        if DATA_ROOT == candidate or DATA_ROOT in candidate.parents:
+            self.send_error_json("找不到文件。", HTTPStatus.NOT_FOUND)
+            return
         if WEB_ROOT not in candidate.parents and candidate != WEB_ROOT:
             self.send_error_json("找不到文件。", HTTPStatus.NOT_FOUND)
             return
@@ -255,6 +270,14 @@ class ReferenceLutHandler(BaseHTTPRequestHandler):
         try:
             if path in {"/api/upload/reference", "/api/upload/content"}:
                 self.handle_upload(path.rsplit("/", 1)[-1])
+            elif path == "/api/video":
+                self.handle_video()
+            elif path == "/api/video/frame":
+                self.handle_video_frame()
+            elif path == "/api/photo":
+                self.handle_photo()
+            elif path == "/api/photo/render":
+                self.handle_photo_render()
             elif path == "/api/analyse":
                 self.handle_analyse()
             elif path == "/api/match":
@@ -267,7 +290,7 @@ class ReferenceLutHandler(BaseHTTPRequestHandler):
                 self.handle_clear_cache()
             else:
                 self.send_error_json("找不到接口。", HTTPStatus.NOT_FOUND)
-        except (ValueError, RuntimeError, subprocess.CalledProcessError) as error:
+        except (ValueError, RuntimeError, subprocess.SubprocessError) as error:
             self.send_error_json(str(error))
         except Exception as error:  # avoid leaking internal paths or tracebacks to the browser
             print(f"Unexpected error: {error}", file=sys.stderr)
@@ -279,6 +302,117 @@ class ReferenceLutHandler(BaseHTTPRequestHandler):
             raise ValueError("图片大小无效或超过 512 MB。")
         filename, body = parse_multipart_file(self.headers.get("Content-Type", ""), self.rfile.read(length))
         self.send_json(self.upload_payload(kind, filename, body))
+
+    def handle_video(self) -> None:
+        filename = Path(unquote(self.headers.get("X-Filename", "")))
+        length = int(self.headers.get("Content-Length", "0"))
+        if filename.suffix.lower() not in {".mp4", ".mov", ".mxf"} or not 0 < length <= 40 * 1024**3:
+            raise ValueError("请选择不超过 40 GB 的 Sony MP4、MOV 或 MXF。")
+        ffprobe = local_executable("ffprobe")
+        if not ffprobe:
+            raise ValueError("打开视频需要安装 ffprobe 和 ffmpeg。")
+        token = uuid.uuid4().hex
+        source = Path(self.server.scratch.name) / (token + filename.suffix.lower())
+        try:
+            with source.open("wb") as output:
+                remaining = length
+                while remaining:
+                    chunk = self.rfile.read(min(1024 * 1024, remaining))
+                    if not chunk:
+                        raise ValueError("视频传输中断。")
+                    output.write(chunk)
+                    remaining -= len(chunk)
+            metadata = video_info(ffprobe, source)
+        except Exception:
+            source.unlink(missing_ok=True)
+            raise
+        self.server.uploads[token] = {"path": source, "kind": "video", "name": filename.name, **metadata}
+        self.send_json({"id": token, **metadata})
+
+    def handle_video_frame(self) -> None:
+        payload = self.read_json()
+        video = self.uploaded(payload.get("videoId"), "video")
+        try:
+            seconds = float(payload.get("seconds", -1))
+        except (ValueError, TypeError) as error:
+            raise ValueError("请输入有效的选帧时间。") from error
+        if not math.isfinite(seconds) or not 0 <= seconds < video["duration"]:
+            raise ValueError("选帧时间超出视频长度。")
+        source_range = payload.get("range") or video["range"]
+        if source_range not in {"full", "video"}:
+            raise ValueError("无法自动识别原片数据范围，请选择 Full 或 Video。")
+        ffmpeg = local_executable("ffmpeg")
+        if not ffmpeg:
+            raise ValueError("取帧需要安装 ffmpeg。")
+        token = uuid.uuid4().hex
+        source = Path(self.server.scratch.name) / f"{token}.dpx"
+        preview = source.with_suffix(".png")
+        try:
+            extract_log_frame(ffmpeg, video["path"], source, seconds, source_range, video["matrix"])
+            pixels = load_rgb_tensor(source)
+            save_preview(pixels, preview)
+        except Exception:
+            source.unlink(missing_ok=True)
+            preview.unlink(missing_ok=True)
+            raise
+        name = f"{video['name']} · {seconds:.3f}s.dpx"
+        self.server.uploads[token] = {"path": source, "preview": preview, "kind": "content",
+                                      "name": name, "normalizedLog": True}
+        self.send_json({"id": token, "name": name, "url": self.artifact_url(preview)})
+
+    def handle_photo(self) -> None:
+        length = int(self.headers.get("Content-Length", "0"))
+        if not 0 < length <= self.max_request_bytes:
+            raise ValueError("照片大小无效或超过 512 MB。")
+        filename, body = parse_multipart_file(self.headers.get("Content-Type", ""), self.rfile.read(length))
+        suffix = Path(filename).suffix.lower()
+        if suffix not in {".jpg", ".jpeg", ".arw"}:
+            raise ValueError("原片支持 Sony ARW 和 JPG。")
+        token = uuid.uuid4().hex
+        path = Path(self.server.scratch.name) / (token + suffix)
+        path.write_bytes(body)
+        try:
+            original = downsample(read_photo(path))
+            self.server.photos[token] = (path, original, {})
+            self.send_json({"id": token})
+        except Exception:
+            path.unlink(missing_ok=True)
+            raise
+
+    def handle_photo_render(self) -> None:
+        payload = self.read_json()
+        photo = self.server.photos.get(str(payload.get("photoId")))
+        if photo is None:
+            raise ValueError("请重新导入原片。")
+        path, proxy, fits = photo
+        controls = payload.get("controls", {})
+        if not isinstance(controls, dict):
+            raise ValueError("调色参数无效。")
+        residual = None
+        reference_id = payload.get("referenceId")
+        if not payload.get("original"):
+            reference = self.uploaded(reference_id, "reference")
+            if reference_id not in fits:
+                fits[reference_id] = fit_photo(proxy, read_photo(reference["path"]))
+            residual = fits[reference_id]
+        else:
+            controls = {"strength": 0}
+        if payload.get("export") is True:
+            rendered = render_photo(read_photo(path), residual, controls)
+            destination = output_directory() / f"cube-and-xmp-{uuid.uuid4().hex[:8]}.jpg"
+            rendered.save(destination, "JPEG", quality=95, subsampling=0, icc_profile=SRGB.tobytes())
+            self.send_json({"url": self.artifact_url(destination, download=True)})
+            return
+        rendered = render_photo(proxy, residual, controls)
+        buffer = BytesIO()
+        rendered.save(buffer, "PNG", icc_profile=SRGB.tobytes())
+        data = buffer.getvalue()
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", "image/png")
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(data)
 
     def handle_analyse(self) -> None:
         payload = self.read_json()
@@ -297,6 +431,8 @@ class ReferenceLutHandler(BaseHTTPRequestHandler):
             raise ValueError("DPX 视频静帧仅可用于 DWG + DI 或 S-Log3 LUT。")
         if space == "slog3" and content["path"].suffix.lower() != ".dpx":
             raise ValueError("S-Log3 LUT 仅接受原生 S-Log3 DPX 视频静帧；请勿导入已转换的 JPG、PNG、WebP 或 TIFF。")
+        if content.get("normalizedLog") and space != "slog3":
+            raise ValueError("Sony 原片自动取帧只能用于 S-Log3 LUT。")
         size = 65 if payload.get("size") == 65 else 33
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
         destination = output_directory()
@@ -313,7 +449,9 @@ class ReferenceLutHandler(BaseHTTPRequestHandler):
             return payload.get(key) is not False
         gamut = "sgamut3" if payload.get("slog3Gamut") == "sgamut3" else "sgamut3-cine"
         input_range = "video" if payload.get("slog3InputRange") == "video" else "full"
-        sony_lc709 = space == "slog3" and gamut == "sgamut3-cine" and input_range == "full"
+        if content.get("normalizedLog") and input_range != "full":
+            raise ValueError("自动取帧已转换为 Full；请使用 LUT 的 Full 输入范围。")
+        sony_lc709 = space == "slog3" and uses_sony_lc709_baseline(gamut=gamut, input_range=input_range)
         args = [
             str(CORE_ROOT / "generate_lut.py"), "--content", str(content["path"]), "--reference", str(reference["path"]),
             "--output", str(cube_path), "--preview", str(preview_path), "--analysis", str(analysis_path),
@@ -337,6 +475,7 @@ class ReferenceLutHandler(BaseHTTPRequestHandler):
         self.send_json({
             "started": True,
             "workingSpace": space,
+            "sonyLc709": sony_lc709,
             "previewUrl": self.artifact_url(preview_path),
             "pngDownloadUrl": self.artifact_url(preview_path, download=True),
             "lutId": self.artifact_url(cube_path).split("/")[2],
@@ -397,7 +536,7 @@ def main() -> None:
     UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
     DEFAULT_EXPORT_ROOT.mkdir(parents=True, exist_ok=True)
     server = ReferenceLutServer((args.host, args.port))
-    print(f"Reference LUT WebUI 已启动：http://{args.host}:{args.port}")
+    print(f"cube and xmp 已启动：http://{args.host}:{args.port}")
     print("按 Ctrl+C 停止服务。")
     try:
         server.serve_forever()

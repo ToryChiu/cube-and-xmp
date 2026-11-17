@@ -1,3 +1,25 @@
+# cube and xmp
+
+源自 Reference Match 的本机色彩匹配工具，保留原项目的 MIT 许可证。
+
+- **视频 LUT**：参考图支持粘贴截图、拖入或选择图片。竖图完整显示。Sony S-Log3 原片可直接打开 MP4、MOV 或 MXF 后按时间选帧，也可以继续导入原生 Log DPX。
+- **照片追色**：参考图可以是调好的视频静帧或照片；原片支持 JPG 和 Sony ARW。支持追色强度、曝光、对比度、高光、阴影、锐化和八组 HSL。导出全分辨率 sRGB JPG。
+- 原片数据在本机处理。视频取帧转换为 Full RGB，保留 S-Log3 曲线，不套显示 LUT。请按相机设置选择 S-Gamut3 或 S-Gamut3.Cine，并核对 Resolve 节点收到的范围。
+
+启动方式：
+
+```sh
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+./run-webui.sh
+```
+
+浏览器打开 http://127.0.0.1:8765 。视频取帧及 DPX 需要能运行 `ffmpeg` 和 `ffprobe`。RAW 显影由 LibRaw 完成，相机及压缩格式支持取决于所安装的版本。
+
+Cine/Full 模式默认可以使用项目的 Rec.709 Gamma 2.4 转换。若你已取得 Sony 官方 LC-709 Look Profile，可把 Full in / Full out 版本放到 `core/lutcore/assets/Sony_SLog3_SGamut3_CineToLC709.cube`，程序会自动用于 Cine/Full 匹配。该文件不随源码分发。
+
+以下是原 Reference Match 的使用说明。
+
 # Reference LUT / 参考图仿色 LUT 生成器
 
 [English README](README.en.md)

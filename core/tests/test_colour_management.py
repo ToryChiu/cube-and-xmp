@@ -32,7 +32,10 @@ class ColourManagementTests(unittest.TestCase):
 
     def test_sony_lc709_baseline_matches_the_bundled_look_profile_midgrey_and_white(self) -> None:
         import torch
-        from lutcore.colour_management import sony_slog3_cine_to_lc709
+        from lutcore.colour_management import sony_slog3_cine_to_lc709, uses_sony_lc709_baseline
+
+        if not uses_sony_lc709_baseline(gamut="sgamut3-cine", input_range="full"):
+            self.skipTest("Optional Sony LC-709 Look Profile is not installed.")
 
         source_slog3 = torch.tensor([[[[420.0 / 1023.0, 598.0 / 1023.0]]]]).repeat(1, 3, 1, 1)
         result = sony_slog3_cine_to_lc709(source_slog3)
@@ -46,7 +49,8 @@ class ColourManagementTests(unittest.TestCase):
 
         dimension = 33
         baked = bake_slog3_to_rec709_residual(torch.zeros((3, dimension, dimension, dimension)), dimension=dimension)
-        source_slog3 = torch.tensor([[[[0.25, 0.50, 0.75]], [[0.30, 0.50, 0.70]], [[0.35, 0.50, 0.65]]]])
+        # The analytical fallback is continuous; the exported cube samples it at grid points.
+        source_slog3 = torch.tensor([[[[8, 16, 24]], [[10, 16, 22]], [[11, 16, 21]]]]) / (dimension - 1)
         actual = apply_residual_tensor(source_slog3, baked)
         expected = slog3_to_display_match_domain(source_slog3)
         difference = (actual - expected).abs()

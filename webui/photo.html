@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>照片追色 · cube and xmp</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/empty-state.css">
+  <link rel="stylesheet" href="css/photo.css">
+</head>
+<body class="photo-page">
+  <header class="topbar"><div class="brand"><span class="mark">C</span>cube and xmp</div><a class="small-button" href="/">视频 LUT</a></header>
+  <main>
+    <header class="work-head"><h1>照片追色</h1><p id="photo-status" role="status">请选择参考图和原片。</p></header>
+    <div class="photo-workspace">
+      <article class="media-card">
+        <header><h2>参考图</h2><button class="small-button" id="photo-reference-choose" type="button">打开图片</button><input type="file" id="photo-reference-file" accept="image/jpeg,image/png,image/webp,image/tiff" hidden></header>
+        <div class="photo-frame" id="photo-reference-drop">
+          <img id="photo-reference" alt="参考图" hidden><p id="photo-reference-empty">按 ⌘V 粘贴截图，或拖入参考图</p>
+        </div>
+        <footer id="photo-reference-name"></footer>
+      </article>
+      <article class="media-card">
+        <header><h2>原片与结果</h2><button class="small-button" id="photo-original-choose" type="button">打开 ARW / JPG</button><input type="file" id="photo-original-file" accept=".arw,.jpeg,.jpg" hidden></header>
+        <div class="photo-frame" id="photo-original-drop">
+          <img id="photo-result" alt="照片预览" hidden><p id="photo-result-empty">拖入 Sony ARW 或 JPG</p>
+        </div>
+        <footer><span id="photo-original-name"></span><label><input type="checkbox" id="photo-show-original" disabled> 查看原片</label></footer>
+      </article>
+      <form class="panel photo-controls" id="photo-controls">
+        <fieldset id="photo-editors" disabled>
+          <legend>调色</legend>
+          <div id="photo-basic"></div>
+          <div class="photo-hsl">
+            <label for="photo-band">HSL 颜色范围</label>
+            <select id="photo-band"></select>
+            <div id="photo-hsl"></div>
+          </div>
+          <button type="reset" class="small-button">重置调整</button>
+          <button type="submit" class="generate">导出 JPG</button>
+        </fieldset>
+      </form>
+    </div>
+  </main>
+  <script src="reference-paste.js"></script>
+  <script src="photo.js"></script>
+</body>
+</html>

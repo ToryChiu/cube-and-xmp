@@ -54,7 +54,7 @@ function setRuntimeStatus(ready) {
 }
 
 function spaceLabel(space = state.space) {
-  return space === 'dwg' ? 'DWG + DI' : space === 'slog3' ? 'S-Log3 → LC-709' : 'Rec.709 Gamma 2.4';
+  return space === 'dwg' ? 'DWG + DI' : space === 'slog3' ? 'S-Log3 → 709' : 'Rec.709 Gamma 2.4';
 }
 
 function updateMatchButton() {
@@ -165,6 +165,7 @@ async function uploadImage(kind, file) {
   form.append('file', file, file.name);
   setStatus(`正在导入${kind === 'reference' ? '参考图' : '视频静帧'}…`);
   const response = await api(`/api/upload/${kind}`, { method: 'POST', body: form });
+  resetCachedResult();
   state[kind] = response;
   await displayImage(kind, response);
   if (kind === 'reference') await analyseReference();
@@ -302,7 +303,7 @@ async function runMatch() {
     document.querySelector('#result-empty').hidden = true;
     await Promise.all([resultImage.decode(), comparisonSourceImage.decode()]);
     state.comparison.enabled = true; state.comparison.position = 50; renderComparison();
-    document.querySelector('#result-meta').textContent = `${state.size} 点 LUT · ${spaceLabel(response.workingSpace)}`;
+    document.querySelector('#result-meta').textContent = `${state.size} 点 LUT · ${response.sonyLc709 ? "S-Log3 → LC-709" : spaceLabel(response.workingSpace)}`;
     document.querySelector('#result-name').textContent = '匹配预览已生成';
     document.querySelector('.result-actions').hidden = false;
     setStatus('匹配完成。可下载 PNG、LUT 或导入 Resolve LUT 库。');
