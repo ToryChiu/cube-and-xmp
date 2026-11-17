@@ -13,7 +13,7 @@ from lutcore.look_controls import LookControls, apply_look_controls
 from lutcore.trilinear import apply_residual_tensor
 
 SRGB = ImageCms.ImageCmsProfile(ImageCms.createProfile("sRGB"))
-HUES = (0, 30, 60, 120, 180, 240, 280, 320)
+HUES = (0, 30, 60, 120, 180, 220, 270, 315)
 
 
 def read_photo(path: Path) -> np.ndarray:
@@ -80,16 +80,17 @@ def adjust_hsl(rgb, edits):
                                   (red - green) / safe_chroma + 4)).remainder(6) * 60
     saturation = chroma / (1 - (2 * light - 1).abs()).clamp_min(1e-6)
     adjustment = torch.zeros((3, *hue.shape), dtype=rgb.dtype)
-    weights = torch.zeros_like(hue)
-    for center in HUES:
-        distance = ((hue - center + 180).remainder(360) - 180).abs()
-        weights += (1 - distance / 50).clamp(0, 1)
-    for center, values in zip(HUES, edits):
+    # Each band has full strength at its centre and blends into its neighbours.
+    # Derive the width from the adjacent centres so blue reaches cyan without gaps.
+    for index, (center, values) in enumerate(zip(HUES, edits)):
         if values == [0, 0, 0]:
             continue
-        distance = ((hue - center + 180).remainder(360) - 180).abs()
-        weight = (1 - distance / 50).clamp(0, 1) / weights.clamp_min(1)
-        weight *= (chroma / .08).clamp(0, 1)
+        previous = HUES[index - 1]
+        following = HUES[(index + 1) % len(HUES)]
+        distance = (hue - center + 180).remainder(360) - 180
+        width = torch.where(distance < 0, (center - previous) % 360, (following - center) % 360)
+        weight = (1 - distance.abs() / width).clamp(0, 1)
+        weight *= (saturation / .04).clamp(0, 1)
         adjustment += torch.tensor(values, dtype=rgb.dtype).view(3, 1, 1, 1, 1) * weight
     hue = (hue + .6 * adjustment[0]).remainder(360) / 60
     saturation = (saturation * (1 + adjustment[1] / 100)).clamp(0, 1)

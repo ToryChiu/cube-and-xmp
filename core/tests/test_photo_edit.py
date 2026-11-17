@@ -33,3 +33,12 @@ class PhotoEditTests(unittest.TestCase):
         output = np.asarray(render_photo(self.source, None, {"strength": 0, "hsl": edits}))
         self.assertFalse(np.array_equal(original[0, 0], output[0, 0]))
         np.testing.assert_array_equal(original[0, 1:], output[0, 1:])
+
+    def test_muted_cyan_and_blue_respond_to_their_matching_controls(self):
+        source = np.array([[[.56, .62, .62], [.56, .60, .62], [.6, .6, .6]]], dtype=np.float32)
+        edits = [[0, 0, 0] for _ in HUES]
+        edits[4][1] = edits[5][1] = -100
+        output = np.asarray(render_photo(source, None, {"strength": 0, "hsl": edits}))
+        np.testing.assert_array_equal(output[0, 0], [150, 150, 150])
+        np.testing.assert_array_equal(output[0, 1], [150, 150, 150])
+        np.testing.assert_array_equal(output[0, 2], [153, 153, 153])

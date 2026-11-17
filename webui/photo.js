@@ -6,6 +6,9 @@
   const before = get('photo-show-original');
   const band = get('photo-band');
   const result = get('photo-result');
+  const pick = get('photo-pick-hue');
+  const hueStatus = get('photo-hue-status');
+  const hueCenters = [0, 30, 60, 120, 180, 220, 270, 315];
   const basic = [
     ['strength', '追色强度', 0, 100, 1, 90], ['exposure', '曝光（EV）', -4, 4, .1, 0],
     ['contrast', '对比度', -100, 100, 1, 0], ['highlights', '高光', -100, 100, 1, 0],
@@ -148,8 +151,53 @@
   hslSliders.forEach(({ input }, i) => {
     input.oninput = () => { edits[band.value][i] = Number(input.value); refreshControls(); queuePreview(); };
   });
+  function stopPicking() {
+    pick.setAttribute('aria-pressed', 'false');
+    result.classList.remove('picking-hue');
+  }
+
+  pick.onclick = () => {
+    if (pick.getAttribute('aria-pressed') === 'true') {
+      stopPicking();
+      hueStatus.textContent = '已取消取色。';
+      return;
+    }
+    if (before.checked || !result.complete || !result.naturalWidth) {
+      hueStatus.textContent = '请在追色结果显示后取色。';
+      return;
+    }
+    pick.setAttribute('aria-pressed', 'true');
+    result.classList.add('picking-hue');
+    hueStatus.textContent = '点预览中的天空、海水或其他颜色。';
+  };
+
+  result.addEventListener('click', event => {
+    if (pick.getAttribute('aria-pressed') !== 'true') return;
+    const box = result.getBoundingClientRect();
+    const scale = Math.min(box.width / result.naturalWidth, box.height / result.naturalHeight);
+    const x = Math.floor((event.clientX - box.left - (box.width - result.naturalWidth * scale) / 2) / scale);
+    const y = Math.floor((event.clientY - box.top - (box.height - result.naturalHeight * scale) / 2) / scale);
+    if (x < 0 || x >= result.naturalWidth || y < 0 || y >= result.naturalHeight) return;
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 1;
+    const context = canvas.getContext('2d');
+    context.drawImage(result, x, y, 1, 1, 0, 0, 1, 1);
+    const [r, g, b] = context.getImageData(0, 0, 1, 1).data;
+    const max = Math.max(r, g, b);
+    const delta = max - Math.min(r, g, b);
+    if (delta < 5) {
+      hueStatus.textContent = '这里接近中性色，请点颜色更明显的位置。';
+      return;
+    }
+    const hue = (60 * (max === r ? (g - b) / delta : max === g ? (b - r) / delta + 2 : (r - g) / delta + 4) + 360) % 360;
+    const distance = center => Math.abs((hue - center + 540) % 360 - 180);
+    band.value = hueCenters.reduce((best, center, i) => distance(center) < distance(hueCenters[best]) ? i : best, 0);
+    refreshControls();
+    stopPicking();
+    hueStatus.textContent = `已选 ${band.selectedOptions[0].text}（取样 ${Math.round(hue)}°），移动滑块调整。`;
+  });
   band.onchange = refreshControls;
-  before.onchange = queuePreview;
+  before.onchange = () => { stopPicking(); queuePreview(); };
 
   function reset() {
     edits = Array.from({ length: band.options.length }, () => [0, 0, 0]);

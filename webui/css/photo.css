@@ -12,3 +12,7 @@
 .photo-hsl select{margin-left:8px}
 @media(max-width:900px){.photo-workspace{grid-template-columns:repeat(2,minmax(0,1fr))}.photo-controls{grid-column:1/-1}}
 @media(max-width:510px){.photo-workspace{grid-template-columns:1fr}}
+#photo-pick-hue{margin-left:6px}
+#photo-pick-hue[aria-pressed=true]{border-color:var(--accent);color:#ffd4ad}
+#photo-hue-status{font-size:12px;color:var(--muted);margin:7px 0}
+.picking-hue{cursor:crosshair}
