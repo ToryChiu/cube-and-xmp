@@ -1,0 +1,64 @@
+:root {
+  --bg:#08090B; --panel:#121417; --panel-2:#191B20;
+  --text:#F1F0ED; --muted:#999A9E; --line:#ffffff17;
+  --accent:#E8A16B; --tube:#F4B47D; --spill:#C77D49;
+  --studio-ease:cubic-bezier(.22,1,.36,1);
+}
+.topbar {
+  position:relative;
+  isolation:isolate;
+  background:#0D0F12;
+}
+.topbar::before,.topbar::after {
+  content:"";
+  position:absolute;
+  pointer-events:none;
+  z-index:-1;
+}
+.topbar::before {
+  inset:0 10% auto;
+  height:1px;
+  background:linear-gradient(90deg,transparent,#e8a16b75 18%,var(--tube) 50%,#e8a16b75 82%,transparent);
+  box-shadow:0 1px 6px #f4b47d60,0 2px 18px #c77d4938;
+  animation:studio-ignite .42s var(--studio-ease) both;
+}
+.topbar::after {
+  inset:0 6% 0;
+  background:radial-gradient(ellipse at 50% 0,#c77d4929,transparent 66%);
+  animation:studio-light .55s ease-out both;
+}
+.brand span,.work-head h1 {font-family:"New York","Songti SC",Georgia,serif;font-weight:500}
+.brand span {letter-spacing:.005em}
+.work-head h1 {letter-spacing:.025em}
+h2,h3,.small-button,.photo-controls legend {font-weight:550}
+output,.status,#reference-meta,#content-meta,#result-meta {font-variant-numeric:tabular-nums}
+output {font-family:ui-monospace,"SF Mono",monospace;font-weight:500}
+.equal-frame,.photo-frame,.video-frame {background:#0D0F12}
+.workspace-nav {background:#08090B}
+.workspace-nav a {position:relative}
+.workspace-nav a[aria-current=page] {background:#191713;color:#ffd9b9}
+.workspace-nav a[aria-current=page]::after {
+  content:"";
+  position:absolute;
+  inset:auto 18% 0;
+  height:1px;
+  background:var(--tube);
+  box-shadow:0 0 6px #f4b47d86;
+}
+.small-button,.settings-button,.generate {
+  transition:box-shadow .19s ease,border-color .19s ease,background-color .19s ease,color .19s ease;
+}
+.small-button:hover:not(:disabled),.generate:hover:not(:disabled),#photo-pick-hue[aria-pressed=true] {
+  border-color:#e8a16b78;
+  box-shadow:inset 0 0 0 .5px #f4b47d45,0 0 7px #e8a16b38,0 0 16px #c77d4919;
+}
+.generate {background:#2b1e16;color:#ffdac0;box-shadow:inset 0 0 0 1px #c77d495c}
+.generate:disabled {background:#191715;color:var(--muted);box-shadow:none}
+.drop-zone.drop-active {background:#0D0F12;box-shadow:inset 0 0 0 1px #f4b47d9c,inset 0 0 18px #e8a16b22}
+.drop-zone.drop-active::after {background:transparent;border-color:transparent;color:var(--text)}
+.work-head,.media-card>header,.photo-controls,.controls,.analysis-panel {animation:studio-light .19s var(--studio-ease) both}
+@keyframes studio-ignite {from{opacity:0;transform:scaleX(.78)}to{opacity:1;transform:scaleX(1)}}
+@keyframes studio-light {from{opacity:0}to{opacity:1}}
+@media(prefers-reduced-motion:reduce) {
+  *,*::before,*::after {animation:none!important;transition:none!important}
+}
